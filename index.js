@@ -7,9 +7,6 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { HttpProxyAgent } = require('http-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { TextEncoder } = require('util');
-const Captcha = require('2captcha');
-
-const captchaSolver = new Captcha.Solver(process.env.TWOCAPTCHA_API_KEY);
 
 const colors = {
   reset: "\x1b[0m",
@@ -74,38 +71,6 @@ const getHeaders = () => {
     'referrer-policy': 'strict-origin-when-cross-origin'
   };
 };
-
-const TURNSTILE_SITEKEYS = [
-  '0x4AAAAAABRnkPBT6yl0YKs1',
-  '0x4AAAAAABQ7nRP0xtYSE9cz',
-  '0x4AAAAAAABqrGSKkHfxTZCx',
-  '0x4AAAAAAABt8IM5u3MULJXb'
-];
-
-const SITE_URL = 'https://www.bitquant.io';
-
-const prompts = [
-  "What are the most popular tokens on Solana right now?",
-  "Can you explain Solana's transaction speed compared to Ethereum?",
-  "What are the top DeFi projects on Solana?",
-  "How does Solana's proof-of-history work?",
-  "What are some upcoming Solana projects to watch?",
-  "Tell me about Solana's ecosystem growth in 2025.",
-  "What is the current price of SOL in USD?",
-  "How secure is the Solana blockchain?",
-  "What are the benefits of using Solana for NFTs?",
-  "Can you list some Solana-based wallets?",
-  "What is the role of SOL in the Solana network?",
-  "How does Solana handle smart contracts?",
-  "What are the latest trends in Solana's DeFi space?",
-  "Explain Solana's staking process.",
-  "What are the risks of investing in Solana tokens?",
-  "How does Solana compare to other layer-1 blockchains?",
-  "What are the most active Solana dApps right now?",
-  "Can you tell me about Solana's governance model?",
-  "What are the top Solana meme coins in 2025?",
-  "How does Solana support cross-chain interoperability?"
-];
 
 async function loadProxies() {
   try {
@@ -173,61 +138,6 @@ async function getRandomProxy() {
   return parseProxy(randomProxy);
 }
 
-async function solveCaptcha(axiosInstance, retryCount = 0) {
-  const maxRetries = TURNSTILE_SITEKEYS.length;
-  
-  if (retryCount >= maxRetries) {
-    throw new Error('All Turnstile sitekeys failed');
-  }
-
-  const siteKey = TURNSTILE_SITEKEYS[retryCount];
-  
-  try {
-    logger.loading(`Solving CAPTCHA with sitekey ${retryCount + 1}/${maxRetries}: ${siteKey}`);
-
-    try {
-      const pageResponse = await axiosInstance.get(SITE_URL);
-      const pageContent = pageResponse.data;
-
-      const sitekeyMatch = pageContent.match(/data-sitekey="([^"]+)"/);
-      if (sitekeyMatch) {
-        const extractedSitekey = sitekeyMatch[1];
-        logger.info(`Extracted sitekey from page: ${extractedSitekey}`);
-        
-        const captchaResponse = await captchaSolver.turnstile({
-          sitekey: extractedSitekey,
-          pageurl: SITE_URL,
-          userAgent: getRandomUserAgent()
-        });
-        
-        logger.success('CAPTCHA solved successfully with extracted sitekey');
-        return captchaResponse.data;
-      }
-    } catch (pageError) {
-      logger.warn(`Failed to extract sitekey from page: ${pageError.message}`);
-    }
-
-    const captchaResponse = await captchaSolver.turnstile({
-      sitekey: siteKey,
-      pageurl: SITE_URL,
-      userAgent: getRandomUserAgent()
-    });
-    
-    logger.success(`CAPTCHA solved successfully with sitekey: ${siteKey}`);
-    return captchaResponse.data;
-    
-  } catch (error) {
-    logger.error(`CAPTCHA solving failed with sitekey ${siteKey}: ${error.message}`);
-    
-    if (error.message.includes('ERROR_SITEKEY') || error.message.includes('ERROR_INVALID_SITEKEY')) {
-      logger.warn(`Sitekey ${siteKey} is invalid, trying next one...`);
-      return await solveCaptcha(axiosInstance, retryCount + 1);
-    }
-    
-    throw error;
-  }
-}
-
 function loadPrivateKeys() {
   const privateKeys = [];
   for (let i = 1; process.env[`PRIVATE_KEY_${i}`]; i++) {
@@ -264,48 +174,9 @@ async function makeRequest(axiosInstance, method, url, data = null, additionalHe
     };
     
     const response = await axiosInstance(config);
-
-    if (response.status === 403 || 
-        (response.data && typeof response.data === 'string' && 
-         (response.data.includes('challenge') || response.data.includes('cloudflare')))) {
-      
-      logger.warn('Cloudflare protection detected, solving CAPTCHA...');
-      const captchaToken = await solveCaptcha(axiosInstance);
-
-      const retryConfig = {
-        ...config,
-        headers: {
-          ...headers,
-          'cf-turnstile-response': captchaToken,
-          'x-turnstile-token': captchaToken
-        }
-      };
-      
-      const retryResponse = await axiosInstance(retryConfig);
-      return retryResponse;
-    }
-    
     return response;
     
   } catch (error) {
-    if (error.response && error.response.status === 403) {
-      logger.warn('403 error detected, attempting CAPTCHA solve...');
-      const captchaToken = await solveCaptcha(axiosInstance);
-
-      const retryConfig = {
-        method,
-        url,
-        headers: {
-          ...headers,
-          'cf-turnstile-response': captchaToken,
-          'x-turnstile-token': captchaToken
-        },
-        ...(data && { data })
-      };
-      
-      const retryResponse = await axiosInstance(retryConfig);
-      return retryResponse;
-    }
     throw error;
   }
 }
@@ -345,41 +216,63 @@ async function getActivityStats(address, idToken, axiosInstance) {
   }
 }
 
-async function performChat(address, idToken, prompt, axiosInstance) {
-  try {
-    const payload = {
-      context: {
-        conversationHistory: [],
-        address,
-        poolPositions: [],
-        availablePools: []
-      },
-      message: { type: 'user', message: prompt }
-    };
-    
-    const response = await makeRequest(
-      axiosInstance,
-      'post',
-      'https://quant-api.opengradient.ai/api/agent/run',
-      payload,
-      { authorization: `Bearer ${idToken}` }
-    );
+const chatPrompts = [
+  "Analyze my portfolio risk and value",
+  "Suggest ways to diversify my crypto holdings",
+  "Provide insights on the Solana market trends",
+  "What are the top performing tokens this week?",
+  "Evaluate my portfolio's performance over the last 30 days",
+  "Suggest a low-risk investment strategy",
+  "What is the current market sentiment for DeFi tokens?",
+  "Analyze the volatility of my assets",
+  "Recommend tokens to add to my portfolio",
+  "How does my portfolio compare to the market average?",
+  "Provide a risk assessment for my current holdings",
+  "What are the latest trends in Solana-based projects?",
+  "Suggest a rebalancing strategy for my portfolio",
+  "Analyze the performance of meme coins in my wallet",
+  "What are the risks of holding concentrated assets?",
+  "Provide a market outlook for the next quarter",
+  "Evaluate my portfolio's exposure to stablecoins",
+  "Suggest trading strategies for high-volatility tokens",
+  "What are the top DeFi pools on Solana?",
+  "Analyze my portfolio's performance against Bitcoin"
+];
 
-    const statsResponse = await makeRequest(
-      axiosInstance,
-      'get',
-      `https://quant-api.opengradient.ai/api/activity/stats?address=${address}`,
-      null,
-      { authorization: `Bearer ${idToken}` }
-    );
-    
-    const currentPoints = statsResponse.data.points;
-    logger.success(`Chat sent: ${prompt} - Points: ${currentPoints}`);
-    return response.data;
-  } catch (error) {
-    logger.error(`Failed to send chat: ${error.message}`);
-    throw error;
+async function performChats(address, idToken, axiosInstance) {
+  logger.loading(`Performing 20 chat interactions for ${address}`);
+  const chatHeaders = {
+    ...getHeaders(),
+    Authorization: `Bearer ${idToken}`
+  };
+
+  for (let i = 0; i < 20; i++) {
+    const prompt = chatPrompts[Math.floor(Math.random() * chatPrompts.length)];
+    logger.step(`Chat ${i + 1}/20: Sending prompt "${prompt}"`);
+
+    try {
+      const response = await makeRequest(
+        axiosInstance,
+        'post',
+        'https://quant-api.opengradient.ai/api/agent/run',
+        {
+          context: {
+            conversationHistory: [{ type: "user", message: prompt }],
+            address,
+            poolPositions: [],
+            availablePools: []
+          },
+          message: { type: "user", message: prompt }
+        },
+        chatHeaders
+      );
+      logger.success(`Chat ${i + 1} completed: ${response.data.message.slice(0, 50)}...`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
+    } catch (error) {
+      logger.error(`Chat ${i + 1} error: ${JSON.stringify(error.response?.data || error.message)}`);
+    }
   }
+  logger.success(`Completed 20 chat interactions for ${address}`);
 }
 
 function randomDelay(min = 1000, max = 3000) {
@@ -483,18 +376,9 @@ async function main() {
         continue;
       }
 
-      const messagesToSend = Math.min(20, remainingMessages);
-      
-      for (let i = 0; i < messagesToSend; i++) {
-        const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-        await performChat(publicKey, idToken, randomPrompt, axiosInstance);
+      await performChats(publicKey, idToken, axiosInstance);
 
-        if (i < messagesToSend - 1) {
-          await randomDelay(2000, 5000);
-        }
-      }
-
-      logger.loading(`Completed ${messagesToSend} chats for ${publicKey}`);
+      logger.loading(`Completed chats for ${publicKey}`);
       console.log(); 
 
       if (index < privateKeys.length - 1) {
