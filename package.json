@@ -1,0 +1,58 @@
+{
+  "name": "bitquant-auto-bot",
+  "version": "1.0.0",
+  "description": "An automated bot for interacting with the Bitquant.io platform to earn points through multiple Solana wallets",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vikitoshi/Bitquant-Auto-Bot.git"
+  },
+  "keywords": [
+    "bitquant",
+    "solana",
+    "automation",
+    "bot",
+    "crypto",
+    "airdrop",
+    "defi",
+    "blockchain",
+    "web3"
+  ],
+  "author": "vikitoshi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/vikitoshi/Bitquant-Auto-Bot/issues"
+  },
+  "homepage": "https://github.com/vikitoshi/Bitquant-Auto-Bot#readme",
+  "dependencies": {
+    "2captcha": "^2.1.0",
+    "axios": "^1.6.0",
+    "base-58": "^0.0.1",
+    "dotenv": "^16.3.1",
+    "http-proxy-agent": "^7.0.0",
+    "https-proxy-agent": "^7.0.2",
+    "socks-proxy-agent": "^8.0.2",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
