@@ -15,7 +15,6 @@ An automated bot for interacting with the Bitquant.io platform, designed to mana
 
 - Node.js v16 or higher
 - npm or yarn package manager
-- 2captcha API key
 - Solana private keys (Base58 encoded)
 - Proxy list (optional but recommended)
 
@@ -34,7 +33,6 @@ npm install
 
 3. Create a `.env` file in the root directory:
 ```env
-TWOCAPTCHA_API_KEY=your_2captcha_api_key_here
 PRIVATE_KEY_1=your_first_solana_private_key_base58
 PRIVATE_KEY_2=your_second_solana_private_key_base58
 PRIVATE_KEY_3=your_third_solana_private_key_base58
@@ -100,13 +98,11 @@ The bot supports various proxy formats in `proxies.txt`:
 4. **Chat Automation**: Sends random Solana-related prompts to earn points
 5. **Rate Limiting**: Respects daily message limits and implements delays between requests
 6. **Proxy Rotation**: Uses random proxies for each wallet to avoid IP restrictions
-7. **CAPTCHA Handling**: Automatically solves Cloudflare Turnstile challenges
 
 ## 📊 Features Overview
 
 - ✅ Multi-wallet automation
 - ✅ Proxy support (HTTP/HTTPS/SOCKS)
-- ✅ CAPTCHA solving integration
 - ✅ Rate limiting and delays
 - ✅ Comprehensive logging
 - ✅ Error handling and recovery
@@ -133,7 +129,6 @@ The bot supports various proxy formats in `proxies.txt`:
 ### Error Messages
 
 - `Wallet is not whitelisted`: Contact Bitquant support for whitelist access
-- `CAPTCHA solving failed`: Check 2captcha balance and API key
 - `Invalid private key format`: Ensure Base58 encoding
 - `Daily message limit reached`: Wait for the next day cycle
 
